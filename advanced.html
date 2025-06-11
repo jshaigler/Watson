@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced mRNA/siRNA Tools</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Copy all base styles from index.html first */
+        :root {
+            --primary-color: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-color: #f1f5f9;
+            --input-bg: #334155;
+            --input-border: #475569;
+            --card-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+            --highlight: #8b5cf6;
+            --success: #10b981;
+            --error: #ef4444;
+            --border-radius: 12px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 25% 15%, rgba(99, 102, 241, 0.1) 0%, transparent 25%),
+                radial-gradient(circle at 75% 85%, rgba(139, 92, 246, 0.1) 0%, transparent 25%);
+            background-attachment: fixed;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Header styles */
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .title-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 8px;
+        }
+
+        .logo {
+            font-size: 36px;
+            color: var(--primary-color);
+        }
+
+        .title {
+            font-size: 32px;
+            font-weight: 700;
+            background: linear-gradient(90deg, var(--primary-color), var(--highlight));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin: 0;
+        }
+
+        .subtitle {
+            font-size: 16px;
+            color: var(--text-color);
+            opacity: 0.8;
+            margin-top: 8px;
+        }
+
+        /* Navigation bar */
+        .navigation-bar {
+            width: 100%;
+            max-width: 1200px;
+            padding: 15px 20px;
+            background: var(--card-bg);
+            margin-bottom: 30px;
+            border-radius: var(--border-radius);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: var(--card-shadow);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .nav-link {
+            color: var(--text-color);
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: var(--border-radius);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-link:hover {
+            background: var(--primary-color);
+            transform: translateY(-2px);
+        }
+
+        .nav-link.active {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        /* Advanced grid layout */
+        .advanced-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            width: 100%;
+        }
+
+        /* Tool card styles */
+        .tool-card {
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            padding: 25px;
+            box-shadow: var(--card-shadow);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .tool-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .tool-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var (--input-border);
+        }
+
+        .tool-icon {
+            font-size: 24px;
+            color: var(--primary-color);
+        }
+
+        .tool-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-color);
+            margin: 0;
+        }
+
+        /* Form elements */
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--input-bg);
+            border: 2px solid var(--input-border);
+            border-radius: var(--border-radius);
+            color: var(--text-color);
+            font-size: 16px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .input:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+
+        .button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 24px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+
+        .button:hover {
+            background-color: var(--primary-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+        }
+
+        .button i {
+            font-size: 18px;
+        }
+
+        /* Results section */
+        .result-section {
+            margin-top: 20px;
+            padding: 15px;
+            background: var(--input-bg);
+            border-radius: var(--border-radius);
+            border-left: 3px solid var(--primary-color);
+        }
+
+        .result-section h3 {
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+
+        .result-section ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .result-section li {
+            padding: 8px 0;
+            border-bottom: 1px solid var(--input-border);
+        }
+
+        .result-section li:last-child {
+            border-bottom: none;
+        }
+
+        /* Visualization container */
+        .visualization-container {
+            width: 100%;
+            height: 400px;
+            border: 1px solid var(--input-border);
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            margin-top: 20px;
+            background: var(--input-bg);
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .advanced-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .tool-card {
+                padding: 20px;
+            }
+
+            .title {
+                font-size: 24px;
+            }
+
+            .navigation-bar {
+                padding: 10px;
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="navigation-bar">
+        <a href="index.html" class="nav-link">
+            <i class="fas fa-home"></i> Main Tool
+        </a>
+        <a href="#" class="nav-link active">Advanced Features</a>
+    </div>
+
+    <button id="themeToggle" class="theme-toggle">
+        <i class="fas fa-moon"></i>
+    </button>
+
+    <div class="container">
+        <header>
+            <div class="title-container">
+                <div class="logo">
+                    <i class="fas fa-flask"></i>
+                </div>
+                <h1 class="title">Advanced mRNA/siRNA Tools</h1>
+            </div>
+            <p class="subtitle">Access advanced features for therapeutic design and analysis</p>
+        </header>
+
+        <div class="advanced-grid">
+            <!-- Target Suggestion Tool -->
+            <div class="tool-card">
+                <div class="tool-header">
+                    <i class="fas fa-bullseye tool-icon"></i>
+                    <h2 class="tool-title">Target Suggestion</h2>
+                </div>
+                <form id="targetSuggestionForm">
+                    <div class="input-group">
+                        <input type="text" class="input" placeholder="Enter disease name" id="diseaseInput" required>
+                    </div>
+                    <button type="submit" class="button">
+                        <i class="fas fa-search"></i> Find Targets
+                    </button>
+                </form>
+                <div id="targetResults" class="result-section"></div>
+            </div>
+
+            <!-- Structure Visualization Tool -->
+            <div class="tool-card">
+                <div class="tool-header">
+                    <i class="fas fa-cube tool-icon"></i>
+                    <h2 class="tool-title">3D Structure Viewer</h2>
+                </div>
+                <form id="structureForm">
+                    <div class="input-group">
+                        <input type="text" class="input" placeholder="Enter PDB ID" id="pdbInput" required>
+                    </div>
+                    <button type="submit" class="button">
+                        <i class="fas fa-eye"></i> View Structure
+                    </button>
+                </form>
+                <div id="structureViewer" class="visualization-container"></div>
+            </div>
+
+            <!-- Gene Editing Simulation -->
+            <div class="tool-card">
+                <div class="tool-header">
+                    <i class="fas fa-dna tool-icon"></i>
+                    <h2 class="tool-title">Edit Simulation</h2>
+                </div>
+                <form id="simulationForm">
+                    <div class="input-group">
+                        <input type="text" class="input" placeholder="Enter gene name" id="geneInput" required>
+                    </div>
+                    <select class="input" id="designType" required>
+                        <option value="">Select design type</option>
+                        <option value="CRISPR">CRISPR</option>
+                        <option value="siRNA">siRNA</option>
+                        <option value="mRNA">mRNA</option>
+                    </select>
+                    <button type="submit" class="button">
+                        <i class="fas fa-play"></i> Run Simulation
+                    </button>
+                </form>
+                <div id="simulationResults" class="result-section"></div>
+            </div>
+
+            <!-- Delivery Strategy Tool -->
+            <div class="tool-card">
+                <div class="tool-header">
+                    <i class="fas fa-truck-medical tool-icon"></i>
+                    <h2 class="tool-title">Delivery Strategy</h2>
+                </div>
+                <form id="deliveryForm">
+                    <div class="input-group">
+                        <input type="text" class="input" placeholder="Enter target tissue" id="tissueInput" required>
+                    </div>
+                    <button type="submit" class="button">
+                        <i class="fas fa-route"></i> Get Strategy
+                    </button>
+                </form>
+                <div id="deliveryResults" class="result-section"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Target Suggestion Handler
+            document.getElementById('targetSuggestionForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const disease = document.getElementById('diseaseInput').value;
+                const resultsDiv = document.getElementById('targetResults');
+                
+                try {
+                    const response = await fetch('http://localhost:5000/target_suggestion', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ disease })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.error) {
+                        resultsDiv.innerHTML = `
+                            <div class="error-message">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                ${data.error}
+                            </div>`;
+                        return;
+                    }
+                    
+                    resultsDiv.innerHTML = `
+                        <h3>Suggested Targets:</h3>
+                        <ul>${data.suggested_targets?.map(target => 
+                            `<li>${target} (Score: ${(data.confidence_scores[target] || 0).toFixed(2)})</li>`
+                        ).join('') || 'No targets found'}</ul>
+                    `;
+                } catch (error) {
+                    resultsDiv.innerHTML = `
+                        <div class="error-message">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            Failed to fetch targets. Please try again.
+                        </div>`;
+                    console.error('Error:', error);
+                }
+            });
+
+            // Structure Visualization Handler
+            document.getElementById('structureForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const moleculeId = document.getElementById('pdbInput').value;
+                try {
+                    const response = await fetch('http://localhost:5000/visualize_structure', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ molecule_id: moleculeId })
+                    });
+                    const data = await response.json();
+                    const viewer = document.getElementById('structureViewer');
+                    viewer.innerHTML = `<iframe src="${data.viewer_url}" width="100%" height="100%" frameborder="0"></iframe>`;
+                } catch (error) {
+                    console.error('Error:', error);
+                }
+            });
+
+            // Simulation Handler
+            document.getElementById('simulationForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const gene = document.getElementById('geneInput').value;
+                const designType = document.getElementById('designType').value;
+                try {
+                    const response = await fetch('http://localhost:5000/simulate_gene_editing', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ gene, design_type: designType })
+                    });
+                    const data = await response.json();
+                    const resultsDiv = document.getElementById('simulationResults');
+                    resultsDiv.innerHTML = `
+                        <h3>Simulation Results:</h3>
+                        <p>Off-target Risk: ${data.off_target_risk}</p>
+                        <p>Predicted Outcome: ${data.predicted_outcome}</p>
+                        <p>Efficiency: ${data.simulated_efficiency}</p>
+                    `;
+                } catch (error) {
+                    console.error('Error:', error);
+                }
+            });
+
+            // Delivery Strategy Handler
+            document.getElementById('deliveryForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const tissueType = document.getElementById('tissueInput').value;
+                const resultsDiv = document.getElementById('deliveryResults');
+                
+                try {
+                    const response = await fetch('http://localhost:5000/delivery_strategy', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ tissue_type: tissueType })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.error) {
+                        resultsDiv.innerHTML = `
+                            <div class="error-message">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                ${data.error}
+                            </div>`;
+                        return;
+                    }
+                    
+                    resultsDiv.innerHTML = `
+                        <h3>Recommended Strategies:</h3>
+                        <ul>${data.recommended_strategies?.map(strategy => 
+                            `<li>${strategy}</li>`
+                        ).join('') || 'No strategies found'}</ul>
+                    `;
+                } catch (error) {
+                    resultsDiv.innerHTML = `
+                        <div class="error-message">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            Failed to fetch delivery strategies. Please try again.
+                        </div>`;
+                    console.error('Error:', error);
+                }
+            });
+
+            // Theme Toggle Handler
+            const themeToggle = document.getElementById('themeToggle');
+            const themeIcon = themeToggle.querySelector('i');
+            let isDarkTheme = true;
+
+            function toggleTheme() {
+                isDarkTheme = !isDarkTheme;
+                document.body.classList.toggle('light-theme');
+                
+                // Update icon
+                if (isDarkTheme) {
+                    themeIcon.classList.remove('fa-sun');
+                    themeIcon.classList.add('fa-moon');
+                } else {
+                    themeIcon.classList.remove('fa-moon');
+                    themeIcon.classList.add('fa-sun');
+                }
+                
+                // Add animation to icon
+                themeIcon.style.animation = 'floatAnimation 0.5s ease';
+                setTimeout(() => {
+                    themeIcon.style.animation = '';
+                }, 500);
+            }
+
+            themeToggle.addEventListener('click', toggleTheme);
+        });
+    </script>
+</body>
+</html>

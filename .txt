@@ -1,0 +1,488 @@
+import google.generativeai as genai
+import sys
+
+if len(sys.argv) > 1:
+    user_prompt = sys.argv[1]
+else:
+    user_prompt = "Create mRNA for the human p53 tumor suppressor protein."  # Default prompt
+import google.ai.generativelanguage as glm
+import os
+import requests
+import pandas as pd
+import re
+from io import StringIO
+# --- NCBI Entrez is now needed ---
+from Bio import Entrez, SeqIO
+from Bio.Seq import Seq
+from Bio.Data import CodonTable
+import json  # To handle function call arguments and tool output
+import time  # For potential rate limiting with Entrez
+from urllib.error import HTTPError  # To catch Entrez errors
+
+# --- NCBI Entrez Configuration ---
+# IMPORTANT: Replace with your actual email address!
+# NCBI requires this to contact you if there are issues with your queries.
+Entrez.email = "jshaigler07@gmail.com"
+if Entrez.email == "your.email@example.org":
+    print("WARNING: Please replace 'your.email@example.org' with your actual email address for Entrez.")
+    # exit() # You might want to uncomment this to force the user to change it
+
+# --- Tool 1: NCBI Protein Search Tool (Replaces UniProt Search) ---
+
+# Configure the Gemini API key
+# (Keep your existing Gemini configuration)
+try:
+    # --- HIDE YOUR API KEY ---
+    # It's better practice to load from environment variables or a secure config file
+    # For example: genai.configure(api_key=os.environ['GOOGLE_API_KEY'])
+    # Using the hardcoded key from your example for now, but strongly advise against it.
+    genai.configure(api_key='AIzaSyBP73uMI4xf7dP6F5UcF0355meIa8VOgIY')  # REMOVE OR REPLACE THIS IN PRODUCTION
+    # --- HIDE YOUR API KEY ---
+except KeyError:
+    print("ERROR: GOOGLE_API_KEY environment variable not set.")
+    exit()
+except Exception as e:
+    print(f"ERROR configuring Gemini: {e}")
+    exit()
+
+
+def search_ncbi_protein(query: str, organism: str = "Homo sapiens", limit: int = 3) -> str:
+    """
+    Searches NCBI Protein database for proteins based on a query string and optional organism.
+    Returns a list of relevant NCBI Protein Accession numbers (e.g., NP_...).
+
+    Args:
+        query (str): Search term (e.g., protein name, function description).
+        organism (str): Scientific name of the organism (e.g., "Homo sapiens", "SARS-CoV-2").
+        Defaults to "Homo sapiens".
+        limit (int): Maximum number of NCBI Protein Accession IDs to return. Defaults to 3.
+
+    Returns:
+        str: A JSON string representing a list of found NCBI Accession IDs (e.g., '["NP_000517.1", "NP_001119587.1"]').
+        Returns an empty list '[]' if no results are found or an error occurs.
+    """
+    print(f"---> Calling NCBI Protein Search Tool: query='{query}', organism='{organism}', limit={limit}")
+    # Construct the search term for Entrez
+    search_term = f'({query}) AND ({organism}[Organism])'
+    # Optionally, filter for specific databases like RefSeq:
+    # search_term += ' AND (srcdb_refseq[PROP])'
+
+    ncbi_accession_ids = []
+    try:
+        # Step 1: Use ESearch to find primary IDs (like GI numbers or internal IDs)
+        print(f"--- Entrez ESearch Query: db=protein, term='{search_term}', retmax={limit}")
+        handle = Entrez.esearch(db="protein", term=search_term, retmax=limit)
+        record = Entrez.read(handle)
+        handle.close()
+        id_list = record["IdList"]
+
+        if not id_list:
+            print("---> NCBI Search Tool: No primary IDs found.")
+            return json.dumps([])
+
+        print(f"--- Found {len(id_list)} primary IDs: {id_list}")
+
+        # Step 2: Use ESummary to get details including AccessionVersion for the found IDs
+        print(f"--- Entrez ESummary Fetching for {len(id_list)} IDs...")
+        summary_handle = Entrez.esummary(db="protein", id=id_list)
+        summaries = Entrez.read(summary_handle)
+        summary_handle.close()
+
+        for summary in summaries:
+            # Extract AccessionVersion (e.g., "NP_000517.1") which is more stable
+            acc_version = summary.get("AccessionVersion", None)
+            if acc_version:
+                ncbi_accession_ids.append(acc_version)
+                print(f"    - Found Accession: {acc_version} (Title: {summary.get('Title', 'N/A')})")
+            else:
+                print(f"    - Warning: Could not get AccessionVersion for ID {summary.get('Id', 'N/A')}")
+
+        print(f"---> NCBI Search Tool Result (Accessions): {ncbi_accession_ids}")
+        return json.dumps(ncbi_accession_ids)
+
+    except HTTPError as e:
+        print(f"Error querying NCBI Entrez (HTTPError): {e}")
+        print(f"Response body: {e.read().decode() if hasattr(e, 'read') else 'N/A'}")
+        return json.dumps([])  # Return JSON array string on error
+    except Exception as e:
+        print(f"An unexpected error occurred during NCBI search: {e}")
+        return json.dumps([])  # Return JSON array string on error
+
+
+# --- Tool 2: mRNA Optimizer Tool (Modified to use NCBI) ---
+
+class ProteinToMRNA:
+    """
+    Generates optimized mRNA sequences from NCBI Protein accession IDs.
+    Includes methods for fetching sequences from NCBI, back-translation, etc.
+    (Codon optimization logic remains the same)
+    """
+
+    def __init__(self):
+        # (Codon tables remain the same)
+        self.codon_table = CodonTable.unambiguous_dna_by_name["Standard"]
+        self.human_codon_optimization = {
+            'A': ['GCC', 'GCT', 'GCA', 'GCG'], 'R': ['CGG', 'AGA', 'AGG', 'CGC', 'CGA', 'CGT'],
+            'N': ['AAC', 'AAT'], 'D': ['GAC', 'GAT'], 'C': ['TGC', 'TGT'], 'Q': ['CAG', 'CAA'],
+            'E': ['GAG', 'GAA'], 'G': ['GGC', 'GGG', 'GGA', 'GGT'], 'H': ['CAC', 'CAT'],
+            'I': ['ATC', 'ATT', 'ATA'], 'L': ['CTG', 'CTC', 'TTG', 'CTT', 'TTA', 'CTA'],
+            'K': ['AAG', 'AAA'], 'M': ['ATG'], 'F': ['TTC', 'TTT'], 'P': ['CCC', 'CCT', 'CCA', 'CCG'],
+            'S': ['AGC', 'TCC', 'TCT', 'AGT', 'TCA', 'TCG'], 'T': ['ACC', 'ACT', 'ACA', 'ACG'],
+            'W': ['TGG'], 'Y': ['TAC', 'TAT'], 'V': ['GTG', 'GTC', 'GTT', 'GTA'],
+            '*': ['TGA', 'TAA', 'TAG']
+        }
+
+    def fetch_ncbi_protein_sequence(self, ncbi_accession_id: str) -> tuple[str | None, str | None]:
+        """
+        Fetch protein sequence and description from NCBI Protein using an Accession ID.
+
+        Args:
+            ncbi_accession_id (str): The NCBI Protein accession ID (e.g., "NP_000517.1").
+
+        Returns:
+            tuple: (protein_sequence, description) or (None, None) if failed.
+                   Description is taken from the FASTA header.
+        """
+        print(f"--- Fetching sequence for NCBI Accession ID: {ncbi_accession_id}")
+        try:
+            # Use Entrez.efetch to get the sequence in FASTA format
+            handle = Entrez.efetch(db="protein", id=ncbi_accession_id, rettype="fasta", retmode="text")
+            record = SeqIO.read(handle, "fasta")  # Use SeqIO to parse FASTA
+            handle.close()
+
+            sequence = str(record.seq)
+            description = record.description  # Get the full FASTA header description
+
+            # Clean up sequence: remove potential stop codons (*) except at the very end
+            if sequence.endswith('*'):
+                sequence = sequence[:-1]
+            sequence = sequence.replace('*', '')  # Remove internal stops if any
+
+            print(f"--- Fetched sequence (length {len(sequence)}) and description: {description}")
+            return sequence, description
+
+        except HTTPError as e:
+            print(f"Error fetching data for NCBI ID {ncbi_accession_id} (HTTPError): {e}")
+            print(f"Response body: {e.read().decode() if hasattr(e, 'read') else 'N/A'}")
+            # Add a small delay before potential retry or next request
+            time.sleep(1)
+            return None, None
+        except Exception as e:
+            # This catches parsing errors (e.g., unexpected format) or other issues
+            print(f"Error fetching/parsing data for NCBI ID {ncbi_accession_id}: {e}")
+            return None, None
+
+    def back_translate(self, protein_sequence: str, optimize: bool = True) -> str | None:
+        # (This function remains the same as it operates on the protein sequence)
+        if not protein_sequence:
+            return None
+        mrna = "ATG"
+        for aa in protein_sequence:
+            if aa == '*':
+                continue  # Should have been removed by fetch, but double-check
+            if aa not in self.human_codon_optimization:
+                print(f"Warning: Skipping unknown or non-standard amino acid '{aa}' in sequence.")
+                continue
+            codons_for_aa = self.human_codon_optimization[aa]
+            if optimize and codons_for_aa:
+                mrna += codons_for_aa[0]  # Use the most frequent codon (first in our list)
+            elif codons_for_aa:
+                mrna += codons_for_aa[0]  # Fallback to first available
+        mrna += "TGA"  # Add a standard stop codon
+        return mrna
+
+    def back_translate_structure_aware(self, protein_sequence: str, target_gc: float = 0.55) -> str | None:
+        # (This function remains the same as it operates on the protein sequence)
+        if not protein_sequence:
+            return None
+        mrna = "ATG"
+        current_gc_count = 1
+        for aa in protein_sequence:
+            if aa == '*':
+                continue
+            if aa not in self.human_codon_optimization:
+                print(f"Warning: Skipping unknown or non-standard amino acid '{aa}' in structure-aware back-translation.")
+                continue
+            candidates = self.human_codon_optimization[aa]
+            if not candidates:
+                continue
+            best_codon = candidates[0]
+            best_diff = float('inf')
+            for codon in candidates:
+                codon_gc_count = codon.count('G') + codon.count('C')
+                prospective_gc_ratio = (current_gc_count + codon_gc_count) / (len(mrna) + 3)
+                diff = abs(prospective_gc_ratio - target_gc)
+                if diff < best_diff:
+                    best_diff = diff
+                    best_codon = codon
+            mrna += best_codon
+            current_gc_count += best_codon.count('G') + best_codon.count('C')
+        mrna += "TGA"
+        return mrna
+
+    def mrna_to_vaccine_format(self, mrna_sequence_dna: str, pseudouridine: bool = False) -> str:
+        # (This function remains the same as it operates on the DNA sequence)
+        if pseudouridine:
+            coding_rna = mrna_sequence_dna.replace('T', 'Ψ')
+        else:
+            coding_rna = mrna_sequence_dna.replace('T', 'U')
+        cap = "m7Gppp"
+        utr_5 = "GGGAUAAGAGAGAAAAGAAGAGUAAGAAGAAAUAUAAGAGCCACC"  # Includes Kozak 'GCCACC' before ATG
+        utr_3 = "UAGUUUUAUUUAAUCAUUUGUAUUUAUUUAAUCAUUUGUAUUAUAUGAUAC"
+        poly_a = "A" * 120
+        complete_mrna = f"{cap}-{utr_5}{coding_rna}-{utr_3}{poly_a}"
+        return complete_mrna
+
+    def get_optimized_mrna_for_ids(self, ncbi_accession_ids: list[str], use_structure_aware: bool = True, use_pseudouridine: bool = True) -> dict:
+        """
+        Main pipeline: Fetches sequences for NCBI Accession IDs, generates optimized mRNA,
+        and formats for vaccine use.
+
+        Args:
+            ncbi_accession_ids (list[str]): List of NCBI Accession IDs to process (e.g., ["NP_000517.1"]).
+            use_structure_aware (bool): Generate structure-aware mRNA version.
+            use_pseudouridine (bool): Generate vaccine format mRNA with Ψ modifications.
+
+        Returns:
+            dict: Results containing sequences and metadata for each successfully processed ID.
+                  Structure: {"results": [ {result_dict_for_id_1}, ... ], "errors": [id1, id2,...]}
+        """
+        all_results = {"results": [], "errors": []}
+
+        for ncbi_id in ncbi_accession_ids:
+            ncbi_id = ncbi_id.strip()
+            if not ncbi_id:
+                continue
+
+            print(f"\n---> Processing NCBI Accession ID: {ncbi_id}")
+            # Use the NCBI fetch function
+            protein_seq, description = self.fetch_ncbi_protein_sequence(ncbi_id)
+
+            if not protein_seq or not description:
+                print(f"--- Failed to fetch sequence for {ncbi_id}. Skipping.")
+                all_results["errors"].append(ncbi_id)
+                continue
+
+            # --- The rest of the processing logic remains largely the same ---
+
+            # Basic back-translation (frequency-optimized)
+            optimized_mrna = self.back_translate(protein_seq, optimize=True)
+            if not optimized_mrna:
+                print(f"--- Failed basic back-translation for {ncbi_id}. Skipping.")
+                all_results["errors"].append(ncbi_id)
+                continue
+
+            gc_content = ((optimized_mrna.count('G') + optimized_mrna.count('C')) /
+                          len(optimized_mrna) * 100) if optimized_mrna else 0
+
+            # Structure-aware back-translation (optional)
+            structure_aware_mrna = None
+            gc_content_sa = None
+            if use_structure_aware:
+                structure_aware_mrna = self.back_translate_structure_aware(protein_seq)
+                if structure_aware_mrna:
+                    gc_content_sa = ((structure_aware_mrna.count('G') + structure_aware_mrna.count('C')) /
+                                     len(structure_aware_mrna) * 100)
+
+            # Convert optimized mRNA to vaccine format
+            vaccine_mrna = self.mrna_to_vaccine_format(optimized_mrna, pseudouridine=use_pseudouridine)
+
+            result = {
+                # Use the correct ID key
+                "ncbi_accession_id": ncbi_id,
+                "description": description,  # Use the description from NCBI FASTA header
+                "protein_sequence_length": len(protein_seq),
+                "protein_sequence_preview": protein_seq[:30] + "..." if len(protein_seq) > 30 else protein_seq,
+                "optimized_mrna_length": len(optimized_mrna),
+                "optimized_mrna_gc_content_%": round(gc_content, 2),
+                "optimized_mrna_preview": optimized_mrna[:60] + "..." if len(optimized_mrna) > 60 else optimized_mrna,
+                "vaccine_format_mrna_preview": vaccine_mrna[:100] + "..." if len(vaccine_mrna) > 100 else vaccine_mrna,
+            }
+
+            if structure_aware_mrna:
+                result["structure_aware_mrna_length"] = len(structure_aware_mrna)
+                result["structure_aware_mrna_gc_content_%"] = round(gc_content_sa, 2) if gc_content_sa is not None else None
+                result["structure_aware_mrna_preview"] = structure_aware_mrna[:60] + "..." if len(structure_aware_mrna) > 60 else structure_aware_mrna
+
+            all_results["results"].append(result)
+            print(f"---> Successfully processed {ncbi_id}")
+
+            # Be nice to NCBI servers - add a small delay between requests
+            time.sleep(0.5)  # Adjust as needed, especially if processing many IDs
+
+        return all_results
+
+
+def generate_mrna_sequences(ncbi_accession_ids_json: str, use_structure_aware: bool = True, use_pseudouridine: bool = True) -> str:
+    """
+    Tool function to generate various mRNA sequences from a list of NCBI Protein Accession IDs.
+
+    Args:
+        ncbi_accession_ids_json (str): A JSON string representing a list of NCBI Protein Accession IDs
+                                       (e.g., '["NP_000517.1", "YP_009724390.1"]').
+        use_structure_aware (bool): Generate structure-aware optimized mRNA. Defaults to True.
+        use_pseudouridine (bool): Use pseudouridine (Ψ) in the vaccine format mRNA.
+                                  Defaults to True (common for vaccines).
+
+    Returns:
+        str: A JSON string containing the results dictionary from ProteinToMRNA.get_optimized_mrna_for_ids.
+             Includes lists of results and errors.
+    """
+    print(f"---> Calling mRNA Generator Tool: use_structure_aware={use_structure_aware}, use_pseudouridine={use_pseudouridine}")
+    try:
+        # Load the list of NCBI Accession IDs
+        ncbi_accession_ids = json.loads(ncbi_accession_ids_json)
+        if not isinstance(ncbi_accession_ids, list):
+            raise ValueError("Input must be a JSON list of strings.")
+        print(f"---> Parsed NCBI Accession IDs: {ncbi_accession_ids}")
+    except json.JSONDecodeError:
+        print("Error: Invalid JSON input for NCBI Accession IDs.")
+        return json.dumps({"results": [], "errors": [], "tool_error": "Invalid JSON input for NCBI Accession IDs."})
+    except ValueError as e:
+        print(f"Error: {e}")
+        return json.dumps({"results": [], "errors": [], "tool_error": str(e)})
+
+    converter = ProteinToMRNA()
+    results = converter.get_optimized_mrna_for_ids(
+        # Pass the correct argument name
+        ncbi_accession_ids=ncbi_accession_ids,
+        use_structure_aware=use_structure_aware,
+        use_pseudouridine=use_pseudouridine
+    )
+    print(f"---> mRNA Generator Tool Result (Summary): {len(results['results'])} successful, {len(results['errors'])} errors.")
+    # Return results as a JSON string for the agent
+    return json.dumps(results)
+
+
+# --- Agent Setup (Using Updated Tools) ---
+
+# Define the tools for the Gemini model using the new NCBI functions
+ncbi_protein_search_tool = glm.Tool(
+    function_declarations=[
+        glm.FunctionDeclaration(
+            name='search_ncbi_protein',  # Use the new function name
+            description="Searches NCBI Protein database for protein Accession IDs based on a descriptive query and organism. Use this first to find IDs.",
+            parameters=glm.Schema(
+                type=glm.Type.OBJECT,
+                properties={
+                    'query': glm.Schema(type=glm.Type.STRING, description="Protein name, function, or description to search for."),
+                    'organism': glm.Schema(type=glm.Type.STRING, description="Scientific name of the target organism (e.g., 'Homo sapiens', 'SARS-CoV-2'). Default: 'Homo sapiens'"),
+                    'limit': glm.Schema(type=glm.Type.INTEGER, description="Maximum number of NCBI Accession IDs to return. Default: 3")
+                },
+                required=['query']
+            )
+        )
+    ]
+)
+
+mrna_generator_tool = glm.Tool(
+    function_declarations=[
+        glm.FunctionDeclaration(
+            name='generate_mrna_sequences',
+            description="Takes a list of NCBI Protein Accession IDs and generates optimized mRNA sequences (frequency-optimized, optionally structure-aware) and a vaccine-formatted mRNA sequence (optionally with pseudouridine).",
+            parameters=glm.Schema(
+                type=glm.Type.OBJECT,
+                properties={
+                    # Updated parameter name and description
+                    'ncbi_accession_ids_json': glm.Schema(type=glm.Type.STRING, description="REQUIRED. A JSON string representing a list of NCBI Protein Accession IDs obtained from search_ncbi_protein. Example: '[\"NP_000517.1\", \"YP_009724390.1\"]'"),
+                    'use_structure_aware': glm.Schema(type=glm.Type.BOOLEAN, description="Generate structure-aware mRNA aiming for optimal GC content. Default: true."),
+                    'use_pseudouridine': glm.Schema(type=glm.Type.BOOLEAN, description="Use pseudouridine (Ψ) instead of uridine (U) in the final vaccine format mRNA. Recommended for stability/immunogenicity. Default: true.")
+                },
+                # Updated required parameter
+                required=['ncbi_accession_ids_json']
+            )
+        )
+    ]
+)
+
+# --- Main Agent Logic (Updated Tool List and Function Mapping) ---
+
+def run_agent(user_prompt: str):
+    """
+    Runs the Gemini agent interaction loop.
+    """
+    # Select the model
+    model = genai.GenerativeModel(
+        model_name='gemini-1.5-pro-latest',  # Using 1.5 Pro as it's generally good with function calling
+        # Update the tools list
+        tools=[ncbi_protein_search_tool, mrna_generator_tool]
+    )
+
+    print(f"\nUser Prompt: {user_prompt}")
+    chat = model.start_chat(enable_automatic_function_calling=False)  # Manual control
+
+    response = chat.send_message(user_prompt)
+
+    while True:
+        function_calls = [part for part in response.candidates[0].content.parts if part.function_call]
+        if not function_calls:
+            break
+
+        api_responses = []  # Collect responses for all calls in this turn
+        for function_call_part in function_calls:
+            function_call = function_call_part.function_call
+            print(f"\n>>> Gemini requests function call: {function_call.name}")
+            print(f">>> Arguments: {dict(function_call.args)}")
+
+            try:
+                # Find the correct function to call (Updated mapping)
+                if function_call.name == "search_ncbi_protein":  # Updated function name
+                    api_function = search_ncbi_protein
+                elif function_call.name == "generate_mrna_sequences":
+                    api_function = generate_mrna_sequences
+                else:
+                    raise ValueError(f"Unknown function call: {function_call.name}")
+
+                args = dict(function_call.args)
+                function_response_content = api_function(**args)
+
+                # Prepare the response part for this function call
+                api_responses.append(glm.Part(
+                    function_response=glm.FunctionResponse(
+                        name=function_call.name,
+                        response={"content": function_response_content}
+                    )
+                ))
+
+            except Exception as e:
+                print(f"!!! Error executing function {function_call.name}: {e}")
+                # Send an error message back for this specific function call
+                api_responses.append(glm.Part(
+                    function_response=glm.FunctionResponse(
+                        name=function_call.name,
+                        response={"error": f"Failed to execute tool: {str(e)}"}
+                    )
+                ))
+                # Decide whether to break or continue with other calls if possible
+                # For simplicity here, we'll let it send the error and continue to potentially process other calls or get the final LLM response
+
+        # Send all collected function responses (successes and errors) back to Gemini in one go
+        if api_responses:
+            response = chat.send_message(api_responses)
+        else:
+            # Should not happen if function_calls was not empty, but as a fallback
+            break
+
+    # --- Final Response from Gemini ---
+    print("\n<<< Gemini's Final Response:")
+    # Check if the last response contains text or just function calls again (shouldn't happen with manual loop)
+    if response.candidates and response.candidates[0].content.parts:
+        final_text = "".join(part.text for part in response.candidates[0].content.parts if hasattr(part, 'text'))
+        print(final_text)
+    else:
+        print("(No final text content received from Gemini)")
+
+
+# --- Example Usage ---
+# if __name__ == "__main__":
+#    # REMINDER: Set Entrez.email at the top of the script!
+#    if Entrez.email == "your.email@example.org":
+#        print("\n\n*** IMPORTANT: Please set your email address in the 'Entrez.email' variable before running! ***\n\n")
+#    else:
+#      # Example prompts (should now work with NCBI)
+#      # prompt = "I need to design an mRNA vaccine targeting the Spike protein of the SARS-CoV-2 virus. Find the relevant protein ID and generate the optimized and vaccine-ready mRNA sequences using pseudouridine and structure-aware optimization."
+#      # prompt = "Generate an mRNA sequence for human insulin using pseudouridine."
+#      prompt = "Create mRNA for the human p53 tumor suppressor protein."
+#
+#      run_agent(prompt)
+    run_agent(user_prompt)

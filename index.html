@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Protein to mRNA Converter</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            /* Dark Theme (default) */
+            --primary-color: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-color: #f1f5f9;
+            --input-bg: #334155;
+            --input-border: #475569;
+            --card-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+            --highlight: #8b5cf6;
+            --success: #10b981;
+            --error: #ef4444;
+            --border-radius: 12px;
+        }
+
+        /* Light Theme */
+        .light-theme {
+            --primary-color: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg-color: #f1f5f9;
+            --card-bg: #ffffff;
+            --text-color: #1e293b;
+            --input-bg: #f8fafc;
+            --input-border: #cbd5e1;
+            --card-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            --highlight: #8b5cf6;
+            --success: #10b981;
+            --error: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 25% 15%, rgba(99, 102, 241, 0.1) 0%, transparent 25%),
+                radial-gradient(circle at 75% 85%, rgba(139, 92, 246, 0.1) 0%, transparent 25%);
+            background-attachment: fixed;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            width: 100%;
+        }
+
+        .title-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 8px;
+        }
+
+        .logo {
+            font-size: 36px;
+            color: var(--primary-color);
+        }
+
+        .title {
+            font-size: 32px;
+            font-weight: 700;
+            background: linear-gradient(90deg, var(--primary-color), var(--highlight));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin: 0;
+        }
+
+        .subtitle {
+            font-size: 16px;
+            color: var(--text-color);
+            opacity: 0.8;
+            margin-top: 8px;
+        }
+
+        .theme-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: transparent;
+            border: none;
+            color: var(--text-color);
+            font-size: 24px;
+            cursor: pointer;
+            padding: 10px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.3s ease, background-color 0.3s ease;
+        }
+
+        .theme-toggle:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            transform: scale(1.1);
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            padding: 30px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--card-shadow);
+            width: 100%;
+            margin-bottom: 30px;
+            overflow: hidden;
+            position: relative;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 24px;
+        }
+
+        .input-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--primary-color);
+            font-size: 18px;
+        }
+
+        .input {
+            width: 100%;
+            padding: 14px 14px 14px 44px;
+            background-color: var(--input-bg);
+            border: 2px solid var(--input-border);
+            border-radius: var(--border-radius);
+            color: var(--text-color);
+            font-size: 16px;
+            outline: none;
+        }
+
+        .input:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+
+        .button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 24px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .button:hover {
+            background-color: var(--primary-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+        }
+
+        .button:active {
+            transform: translateY(0);
+        }
+
+        .button i {
+            font-size: 18px;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(99, 102, 241, 0.3);
+            border-radius: 50%;
+            border-top-color: var(--primary-color);
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .result-container {
+            background-color: var(--card-bg);
+            padding: 30px;
+            border-radius: var(--border-radius);
+            width: 100%;
+            box-shadow: var(--card-shadow);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .result-container.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--input-border);
+        }
+
+        .result-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .result-badge {
+            background-color: var(--success);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .result-badge.error {
+            background-color: var(--error);
+        }
+
+        .result-section {
+            margin-bottom: 20px;
+        }
+
+        .result-label {
+            font-size: 14px;
+            opacity: 0.7;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .result-value {
+            padding: 12px;
+            background-color: var(--input-bg);
+            border-radius: 8px;
+            font-family: 'Roboto Mono', monospace;
+            overflow-wrap: break-word;
+            word-break: break-word;
+            font-size: 14px;
+            margin-bottom: 10px;
+            border-left: 3px solid var(--primary-color);
+        }
+
+        .result-stats {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+
+        .stat-item {
+            flex: 1;
+            min-width: 130px;
+            padding: 15px;
+            background-color: var(--input-bg);
+            border-radius: 8px;
+            text-align: center;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.7;
+        }
+
+        .error-message {
+            background-color: rgba(239, 68, 68, 0.1);
+            border-left: 3px solid var(--error);
+            padding: 15px;
+            border-radius: 8px;
+            color: var(--error);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .dna-animation {
+            position: absolute;
+            right: -50px;
+            top: -30px;
+            width: 150px;
+            height: 150px;
+            opacity: 0.1;
+            pointer-events: none;
+        }
+
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 14px;
+            opacity: 0.7;
+        }
+
+        /* Tooltip */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            margin-left: 5px;
+        }
+
+        .tooltip i {
+            font-size: 14px;
+            color: var(--text-color);
+            opacity: 0.7;
+        }
+
+        .tooltip .tooltip-text {
+            visibility: hidden;
+            width: 200px;
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            text-align: center;
+            border-radius: 6px;
+            padding: 10px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            box-shadow: var(--card-shadow);
+            font-size: 12px;
+            border: 1px solid var(--input-border);
+        }
+
+        .tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* Copy button */
+        .copy-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-color);
+            opacity: 0.6;
+            cursor: pointer;
+            padding: 5px;
+            margin-left: 5px;
+            border-radius: 4px;
+            transition: opacity 0.2s;
+        }
+
+        .copy-btn:hover {
+            opacity: 1;
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Animation keyframes */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes floatAnimation {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+            100% { transform: translateY(0); }
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .card, .result-container {
+                padding: 20px;
+            }
+            
+            .title {
+                font-size: 24px;
+            }
+            
+            .dna-animation {
+                display: none;
+            }
+            
+            .theme-toggle {
+                top: 10px;
+                right: 10px;
+            }
+            
+            .result-stats {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .stat-item {
+                min-width: 100%;
+            }
+        }
+
+        /* Add this after your existing styles */
+        .mode-toggle {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .mode-btn {
+            padding: 8px 16px;
+            border: 2px solid var(--primary-color);
+            background: transparent;
+            color: var(--text-color);
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .mode-btn.active {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .mode-btn:hover:not(.active) {
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        /* Add siRNA-specific result styles */
+        .sirna-candidate {
+            background: var(--input-bg);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 3px solid var(--primary-color);
+        }
+
+        .candidate-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .candidate-number {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .candidate-gc {
+            background: var(--primary-color);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+
+        #crisprOptions {
+            margin-bottom: 16px; /* Add spacing below the dropdown */
+        }
+    </style>
+</head>
+<body>
+    <button id="themeToggle" class="theme-toggle">
+        <i class="fas fa-moon"></i>
+    </button>
+    
+    <div class="container">
+        <header>
+            <div class="title-container">
+                <div class="logo">
+                    <i class="fas fa-dna"></i>
+                </div>
+                <h1 class="title">Protein to mRNA/siRNA Converter</h1>
+            </div>
+            <p class="subtitle">Translate protein names into optimized mRNA sequences or design siRNA molecules</p>
+            <div class="mode-toggle">
+                <button class="mode-btn active" data-mode="mrna">mRNA Mode</button>
+                <button class="mode-btn" data-mode="sirna">siRNA Mode</button>
+                <button class="mode-btn" data-mode="crispr">CRISPR Mode</button>
+            </div>
+            <div class="advanced-link" style="margin-top: 10px;">
+                <a href="advanced.html" class="nav-link">
+                    <i class="fas fa-flask"></i> Advanced Features
+                </a>
+            </div>
+        </header>
+        
+        <div class="card">
+            <svg class="dna-animation" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                <!-- DNA helix animation SVG goes here -->
+                <path d="M30,20 Q50,10 70,20 T70,40 T30,60 T70,80" stroke="currentColor" fill="none" stroke-width="2">
+                    <animate attributeName="d" 
+                        values="M30,20 Q50,10 70,20 T70,40 T30,60 T70,80;
+                                M30,40 Q50,30 70,40 T70,60 T30,80 T70,100;
+                                M30,20 Q50,10 70,20 T70,40 T30,60 T70,80" 
+                        dur="5s" 
+                        repeatCount="indefinite" />
+                </path>
+                <path d="M30,20 L70,20 M30,40 L70,40 M30,60 L70,60 M30,80 L70,80" stroke="currentColor" stroke-width="2" opacity="0.5">
+                    <animate attributeName="d" 
+                        values="M30,20 L70,20 M30,40 L70,40 M30,60 L70,60 M30,80 L70,80;
+                                M30,40 L70,40 M30,60 L70,60 M30,80 L70,80 M30,100 L70,100;
+                                M30,20 L70,20 M30,40 L70,40 M30,60 L70,60 M30,80 L70,80" 
+                        dur="5s" 
+                        repeatCount="indefinite" />
+                </path>
+            </svg>
+            
+            <form id="mainForm">
+                <div class="input-group">
+                    <i class="fas fa-search input-icon"></i>
+                    <input 
+                        type="text" 
+                        id="mainInput"
+                        class="input"
+                        placeholder="Enter protein name (e.g., insulin, hemoglobin, spike)"
+                        autocomplete="off"
+                        required
+                    >
+                </div>
+                <div id="crisprOptions" style="display: none;">
+                    <label for="editFunction" class="result-label">Edit Function</label>
+                    <select id="editFunction" class="input">
+                        <option value="delete">Delete</option>
+                        <option value="insert">Insert</option>
+                        <option value="modify">Modify</option>
+                        <option value="activate">Activate</option>
+                        <option value="interfere">Interfere</option>
+                    </select>
+                </div>
+                <button type="submit" class="button">
+                    <i class="fas fa-dna"></i>
+                    Generate mRNA Sequence
+                </button>
+            </form>
+        </div>
+        
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p style="margin-top: 10px;">Processing protein data...</p>
+        </div>
+        
+        <div id="resultContainer" class="result-container">
+            <div class="result-header">
+                <h2 class="result-title">mRNA Sequence Results</h2>
+                <div id="resultBadge" class="result-badge">
+                    <i class="fas fa-check-circle"></i>
+                    Success
+                </div>
+            </div>
+            
+            <div id="resultContent">
+                <p>Enter a protein name above to get the corresponding mRNA sequence.</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="footer">
+        © 2025 Protein to mRNA Converter | All rights reserved
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Theme toggle functionality
+        const themeToggle = document.getElementById('themeToggle');
+        const themeIcon = themeToggle.querySelector('i');
+        let isDarkTheme = true;
+
+        function toggleTheme() {
+            isDarkTheme = !isDarkTheme;
+            document.body.classList.toggle('light-theme');
+            
+            // Update icon
+            if (isDarkTheme) {
+                themeIcon.classList.remove('fa-sun');
+                themeIcon.classList.add('fa-moon');
+            } else {
+                themeIcon.classList.remove('fa-moon');
+                themeIcon.classList.add('fa-sun');
+            }
+            
+            // Add animation to icon
+            themeIcon.style.animation = 'floatAnimation 0.5s ease';
+            setTimeout(() => {
+                themeIcon.style.animation = '';
+            }, 500);
+        }
+
+        themeToggle.addEventListener('click', toggleTheme);
+
+        // Form submission handler
+        const mainForm = document.getElementById('mainForm');
+        const mainInput = document.getElementById('mainInput');
+        const resultContainer = document.getElementById('resultContainer');
+        const loading = document.getElementById('loading');
+        const resultBadge = document.getElementById('resultBadge');
+        const resultContent = document.getElementById('resultContent');
+
+        function copyToClipboard(text, buttonElement) {
+            navigator.clipboard.writeText(text).then(() => {
+                // Change icon temporarily
+                const originalIcon = buttonElement.innerHTML;
+                buttonElement.innerHTML = '<i class="fas fa-check"></i>';
+                setTimeout(() => {
+                    buttonElement.innerHTML = originalIcon;
+                }, 1500);
+            });
+        }
+
+        mainForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const inputName = mainInput.value.trim();
+            if (!inputName) return;
+            
+            const editFunction = document.getElementById('editFunction')?.value;
+            const endpoint = currentMode === 'sirna' ? '/get_sirna' :
+                             currentMode === 'crispr' ? '/design_crispr' : '/get_mrna';
+
+            const requestBody = currentMode === 'crispr' 
+                ? { gene_name: inputName, edit_function: editFunction }
+                : { protein_name: inputName };
+
+            // Hide results and show loading
+            resultContainer.classList.remove('visible');
+            loading.style.display = 'block';
+
+            try {
+                const response = await fetch(`http://localhost:5000${endpoint}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody),
+                });
+
+                const result = await response.json();
+                loading.style.display = 'none';
+
+                if (result.error) {
+                    showError(result.error);
+                } else {
+                    if (currentMode === 'crispr') {
+                        showCRISPRResults(result);
+                    } else if (currentMode === 'sirna') {
+                        showSiRNAResults(result);
+                    } else {
+                        showMRNAResults(result);
+                    }
+                }
+
+                setTimeout(() => {
+                    resultContainer.classList.add('visible');
+                }, 100);
+
+            } catch (error) {
+                console.error('Error:', error);
+                loading.style.display = 'none';
+                showError('Failed to fetch data. Please check your connection and try again.');
+            }
+        });
+
+        // Mode switching functionality
+        const modeBtns = document.querySelectorAll('.mode-btn');
+        let currentMode = 'mrna';
+
+        modeBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                modeBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentMode = btn.dataset.mode;
+
+                const submitBtn = document.querySelector('.button');
+                const input = document.getElementById('mainInput');
+                const crisprOptions = document.getElementById('crisprOptions');
+
+                if (currentMode === 'sirna') {
+                    submitBtn.innerHTML = '<i class="fas fa-scissors"></i> Design siRNA';
+                    input.placeholder = "Enter protein name for siRNA design";
+                    crisprOptions.style.display = 'none';
+                } else if (currentMode === 'crispr') {
+                    submitBtn.innerHTML = '<i class="fas fa-dna"></i> Design CRISPR Complex';
+                    input.placeholder = "Enter gene name for CRISPR design";
+                    crisprOptions.style.display = 'block';
+                } else {
+                    submitBtn.innerHTML = '<i class="fas fa-dna"></i> Generate mRNA Sequence';
+                    input.placeholder = "Enter protein name (e.g., insulin, hemoglobin, spike)";
+                    crisprOptions.style.display = 'none';
+                }
+
+                // Clear previous results
+                resultContainer.classList.remove('visible');
+                resultContent.innerHTML = '<p>Enter a name above to get started.</p>';
+            });
+        });
+
+        // Display CRISPR results
+        function showCRISPRResults(result) {
+            resultBadge.innerHTML = '<i class="fas fa-check-circle"></i> Success';
+            resultBadge.classList.remove('error');
+
+            resultContent.innerHTML = `
+                <div class="result-section">
+                    <div class="result-label">Gene</div>
+                    <div class="result-value">${result.Gene}</div>
+                </div>
+                <div class="result-section">
+                    <div class="result-label">gRNA</div>
+                    <div class="result-value">${result.gRNA}</div>
+                </div>
+                <div class="result-section">
+                    <div class="result-label">PAM</div>
+                    <div class="result-value">${result.PAM}</div>
+                </div>
+                <div class="result-section">
+                    <div class="result-label">Cas Protein</div>
+                    <div class="result-value">${result["Cas Protein"]}</div>
+                </div>
+                <div class="result-section">
+                    <div class="result-label">Off-Target Effects</div>
+                    <div class="result-value">Count: ${result["Off-Target Effects"].Count}</div>
+                </div>
+                <div class="result-section">
+                    <div class="result-label">Secondary Structure</div>
+                    <div class="result-value">${result["Secondary Structure"]}</div>
+                </div>
+                <div class="result-section">
+                    <div class="result-label">Suggested Delivery Systems</div>
+                    <div class="result-value">${result["Suggested Delivery Systems"].join(', ')}</div>
+                </div>
+            `;
+        }
+
+        // Display mRNA results
+        function showMRNAResults(result) {
+            resultBadge.innerHTML = '<i class="fas fa-check-circle"></i> Success';
+            resultBadge.classList.remove('error');
+
+            resultContent.innerHTML = `
+                <div class="result-section">
+                    <div class="result-label">Protein Name</div>
+                    <div class="result-value">${result.protein_name}</div>
+                </div>
+                <div class="result-section">
+                    <div class="result-label">Optimized mRNA Sequence</div>
+                    <div class="result-value">${result.optimized_mrna}</div>
+                </div>
+            `;
+        }
+
+        // Display siRNA results
+        function showSiRNAResults(result) {
+            resultBadge.innerHTML = '<i class="fas fa-check-circle"></i> Success';
+            resultBadge.classList.remove('error');
+
+            const candidates = result.siRNA_candidates || [];
+            resultContent.innerHTML = candidates.length
+                ? candidates.map((candidate, index) => `
+                    <div class="sirna-candidate">
+                        <div class="candidate-header">
+                            <span class="candidate-number">Candidate ${index + 1}</span>
+                            <span class="candidate-gc">GC Content: ${candidate.GC_content}%</span>
+                        </div>
+                        <div class="result-section">
+                            <div class="result-label">Sense Strand</div>
+                            <div class="result-value">${candidate.siRNA_sense}</div>
+                        </div>
+                        <div class="result-section">
+                            <div class="result-label">Antisense Strand</div>
+                            <div class="result-value">${candidate.siRNA_antisense}</div>
+                        </div>
+                        <div class="result-section">
+                            <div class="result-label">Target Region</div>
+                            <div class="result-value">Position ${candidate.target_region}</div>
+                        </div>
+                    </div>
+                `).join('')
+                : '<p>No siRNA candidates found for the given input.</p>';
+        }
+
+        // Display error messages
+        function showError(message) {
+            resultBadge.innerHTML = '<i class="fas fa-exclamation-circle"></i> Error';
+            resultBadge.classList.add('error');
+
+            resultContent.innerHTML = `
+                <div class="error-message">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    ${message}
+                </div>
+            `;
+        }
+    });
+</script>
+</body>
+</html>

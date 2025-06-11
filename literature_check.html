@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Literature Checker</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+      /* Basic styling for literature checker */
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f5f5f5;
+        margin: 0;
+        padding: 0;
+      }
+      .container {
+        max-width: 800px;
+        margin: 50px auto;
+        background-color: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      }
+      h1 {
+        text-align: center;
+        color: #333;
+      }
+      form {
+        margin-bottom: 20px;
+      }
+      .input-group {
+        margin-bottom: 10px;
+      }
+      input[type="text"] {
+        width: 100%;
+        padding: 10px;
+        font-size: 16px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+      button {
+        padding: 10px 20px;
+        font-size: 16px;
+        font-weight: bold;
+        color: #fff;
+        background-color: #6366f1;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #4f46e5;
+      }
+      .results {
+        margin-top: 20px;
+      }
+      .paper {
+        border-bottom: 1px solid #ddd;
+        padding: 10px 0;
+      }
+      .paper:last-child {
+        border-bottom: none;
+      }
+      .paper-title {
+        font-size: 18px;
+        font-weight: bold;
+        color: #333;
+      }
+      .paper-details {
+        font-size: 14px;
+        color: #666;
+      }
+      .paper-link a {
+        color: #6366f1;
+        text-decoration: none;
+      }
+    </style>
+</head>
+<body>
+    <div class="container">
+      <h1>Literature Checker</h1>
+      <form id="literatureForm">
+        <div class="input-group">
+          <input type="text" id="queryInput" placeholder="Enter protein or gene name" required>
+        </div>
+        <button type="submit">Search Literature</button>
+      </form>
+      <div id="results" class="results"></div>
+    </div>
+    <script>
+      document.getElementById('literatureForm').addEventListener('submit', async function(e) {
+          e.preventDefault();
+          const query = document.getElementById('queryInput').value.trim();
+          const resultsDiv = document.getElementById('results');
+          
+          resultsDiv.innerHTML = '<p>Loading results...</p>';
+          
+          try {
+              const response = await fetch('http://localhost:5000/literature_check', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ protein_name: query })
+              });
+              const data = await response.json();
+              if(data.error) {
+                  resultsDiv.innerHTML = `<p>Error: ${data.error}</p>`;
+                  return;
+              }
+              if(!data.results.length) {
+                  resultsDiv.innerHTML = '<p>No literature found.</p>';
+                  return;
+              }
+              let html = '';
+              data.results.forEach(paper => {
+                  html += `
+                    <div class="paper">
+                      <div class="paper-title">${paper.title}</div>
+                      <div class="paper-details">
+                        Journal: ${paper.journal || 'N/A'} | Year: ${paper.year || 'N/A'} | Type: ${paper.type || 'N/A'}
+                      </div>
+                      <div class="paper-link">
+                        <a href="${paper.link}" target="_blank">View Article</a>
+                      </div>
+                    </div>
+                  `;
+              });
+              resultsDiv.innerHTML = html;
+          } catch (error) {
+              console.error('Error:', error);
+              resultsDiv.innerHTML = '<p>Error fetching literature. Please try again later.</p>';
+          }
+      });
+    </script>
+</body>
+</html>
+```    
+
+To test the literature checking system, start your Flask server and open this HTML file (for example, by opening it in your browser using Visual Studio Code's Live Server extension or directly via file:// URL).// filepath: c:\Users\17049\Desktop\mRNAI\literature_check.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Literature Checker</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+      /* Basic styling for literature checker */
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f5f5f5;
+        margin: 0;
+        padding: 0;
+      }
+      .container {
+        max-width: 800px;
+        margin: 50px auto;
+        background-color: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      }
+      h1 {
+        text-align: center;
+        color: #333;
+      }
+      form {
+        margin-bottom: 20px;
+      }
+      .input-group {
+        margin-bottom: 10px;
+      }
+      input[type="text"] {
+        width: 100%;
+        padding: 10px;
+        font-size: 16px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+      button {
+        padding: 10px 20px;
+        font-size: 16px;
+        font-weight: bold;
+        color: #fff;
+        background-color: #6366f1;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #4f46e5;
+      }
+      .results {
+        margin-top: 20px;
+      }
+      .paper {
+        border-bottom: 1px solid #ddd;
+        padding: 10px 0;
+      }
+      .paper:last-child {
+        border-bottom: none;
+      }
+      .paper-title {
+        font-size: 18px;
+        font-weight: bold;
+        color: #333;
+      }
+      .paper-details {
+        font-size: 14px;
+        color: #666;
+      }
+      .paper-link a {
+        color: #6366f1;
+        text-decoration: none;
+      }
+    </style>
+</head>
+<body>
+    <div class="container">
+      <h1>Literature Checker</h1>
+      <form id="literatureForm">
+        <div class="input-group">
+          <input type="text" id="queryInput" placeholder="Enter protein or gene name" required>
+        </div>
+        <button type="submit">Search Literature</button>
+      </form>
+      <div id="results" class="results"></div>
+    </div>
+    <script>
+      document.getElementById('literatureForm').addEventListener('submit', async function(e) {
+          e.preventDefault();
+          const query = document.getElementById('queryInput').value.trim();
+          const resultsDiv = document.getElementById('results');
+          
+          resultsDiv.innerHTML = '<p>Loading results...</p>';
+          
+          try {
+              const response = await fetch('http://localhost:5000/literature_check', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ protein_name: query })
+              });
+              const data = await response.json();
+              if(data.error) {
+                  resultsDiv.innerHTML = `<p>Error: ${data.error}</p>`;
+                  return;
+              }
+              if(!data.results.length) {
+                  resultsDiv.innerHTML = '<p>No literature found.</p>';
+                  return;
+              }
+              let html = '';
+              data.results.forEach(paper => {
+                  html += `
+                    <div class="paper">
+                      <div class="paper-title">${paper.title}</div>
+                      <div class="paper-details">
+                        Journal: ${paper.journal || 'N/A'} | Year: ${paper.year || 'N/A'} | Type: ${paper.type || 'N/A'}
+                      </div>
+                      <div class="paper-link">
+                        <a href="${paper.link}" target="_blank">View Article</a>
+                      </div>
+                    </div>
+                  `;
+              });
+              resultsDiv.innerHTML = html;
+          } catch (error) {
+              console.error('Error:', error);
+              resultsDiv.innerHTML = '<p>Error fetching literature. Please try again later.</p>';
+          }
+      });
+    </script>
+</body>
+</html>
+```    
+
+To test the literature checking system, start your Flask server and open this HTML file (for example, by opening it in your browser using Visual Studio Code's Live Server extension or directly via file:// URL).
